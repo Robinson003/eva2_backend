@@ -1,0 +1,110 @@
+{% extends 'ventas/base.html' %}
+{% block title %}Dashboard de Frutas{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">🍎 Dashboard de Ventas de Frutas 🍌🍓</h1>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+  <!-- Productos más vendidos -->
+  <section class="bg-white p-4 rounded shadow">
+    <h2 class="font-semibold mb-2 text-lg">🍏 Productos más vendidos</h2>
+    <div class="relative h-64 w-full">
+      <canvas id="chartProd"></canvas>
+    </div>
+    <ul class="mt-4 list-disc list-inside text-sm text-gray-700">
+      {% for p in top_prod %}
+      <li>{{ forloop.counter }}. {{ p.producto__nombre }} — {{ p.total_vendido|floatformat:0 }} Kilos</li>
+      {% empty %}
+      <li>No hay datos disponibles</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <!-- Clientes con más compras -->
+  <section class="bg-white p-4 rounded shadow">
+    <h2 class="font-semibold mb-2 text-lg">👥 Clientes con más compras</h2>
+    <div class="relative h-64 w-full">
+      <canvas id="chartCli"></canvas>
+    </div>
+    <ul class="mt-4 list-disc list-inside text-sm text-gray-700">
+      {% for c in top_clientes %}
+      <li>{{ forloop.counter }}. {{ c.cliente__nombre }} — {{ c.total_ventas|floatformat:0 }} pesos</li>
+      {% empty %}
+      <li>No hay datos disponibles</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Parsear JSON pasado desde la vista
+  const topProd = JSON.parse('{{ top_prod_json|escapejs }}');
+  const topClientes = JSON.parse('{{ top_clientes_json|escapejs }}');
+
+  const prodLabels = topProd.map(p => p["producto__nombre"]);
+  const prodData = topProd.map(p => p.total_vendido);
+
+  const cliLabels = topClientes.map(c => c["cliente__nombre"]);
+  const cliData = topClientes.map(c => c.total_ventas);
+
+  // Gráfico de productos (frutas)
+  const ctxProd = document.getElementById('chartProd').getContext('2d');
+  new Chart(ctxProd, {
+    type: 'bar',
+    data: {
+      labels: prodLabels,
+      datasets: [{
+        label: 'Kilos vendidas',
+        data: prodData,
+        backgroundColor: [
+          'rgba(255,99,132,0.6)',   // fresa
+          'rgba(255,206,86,0.6)',   // plátano
+          'rgba(75,192,192,0.6)',   // manzana
+          'rgba(153,102,255,0.6)',  // uva
+          'rgba(255,159,64,0.6)',   // naranja/mango
+          'rgba(54,162,235,0.6)'    // azul decorativo
+        ],
+        borderColor: [
+          'rgba(255,99,132,1)',
+          'rgba(255,206,86,1)',
+          'rgba(75,192,192,1)',
+          'rgba(153,102,255,1)',
+          'rgba(255,159,64,1)',
+          'rgba(54,162,235,1)'
+        ],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true } },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  // Gráfico de clientes
+  const ctxCli = document.getElementById('chartCli').getContext('2d');
+  new Chart(ctxCli, {
+    type: 'bar',
+    data: {
+      labels: cliLabels,
+      datasets: [{
+        label: 'Total compras',
+        data: cliData,
+        backgroundColor: 'rgba(34,197,94,0.6)', // verde
+        borderColor: 'rgba(34,197,94,1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true } },
+      plugins: { legend: { display: false } }
+    }
+  });
+</script>
+{% endblock %}
