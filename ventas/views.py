@@ -1,38 +1,104 @@
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, TemplateView
 from django.urls import reverse_lazy
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.forms import UserCreationForm
+from django.shortcuts import redirect, render
+from django.contrib import messages
 from .models import Cliente, Producto, Venta, DetalleVenta
 from django.db.models import Sum
 import json
+from django.db.models.deletion import ProtectedError
+
+
+# ---------------- LOGIN / LOGOUT / REGISTRO ----------------
+class CustomLoginView(LoginView):
+    template_name = 'ventas/login.html'
+    redirect_authenticated_user = True
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+
+        # Solo agrega clases, NO reemplaza el widget
+        form.fields["username"].widget.attrs.update({
+            "class": "w-full p-2 border rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+        })
+
+        form.fields["password"].widget.attrs.update({
+            "class": "w-full p-2 border rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+        })
+
+        return form
+
+    def get_success_url(self):
+        return reverse_lazy('ventas:home')
+
+
+class CustomLogoutView(LogoutView):
+    next_page = reverse_lazy('ventas:login')
+
+
+def registro_view(request):
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "✅ Usuario creado correctamente. Ahora puedes iniciar sesión.")
+            return redirect('ventas:login')
+        else:
+            messages.error(request, "❌ Corrige los errores del formulario.")
+    else:
+        form = UserCreationForm()
+
+    # Aplicar estilo Tailwind
+    for field in form.visible_fields():
+        field.field.widget.attrs.update({
+            "class": "w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+        })
+
+
+    return render(request, 'ventas/registro.html', {'form': form})
+
+
 
 # ---------------- HOME ----------------
-class HomeView(TemplateView):
+class HomeView(LoginRequiredMixin, TemplateView):
     template_name = 'ventas/home.html'
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
 
         # Top 5 productos más vendidos
-        top_prod = DetalleVenta.objects.values('producto__nombre') \
-                    .annotate(total_vendido=Sum('cantidad')) \
-                    .order_by('-total_vendido')[:5]
+        top_prod = (
+            DetalleVenta.objects.values('producto__nombre')
+            .annotate(total_vendido=Sum('cantidad'))
+            .order_by('-total_vendido')[:5]
+        )
 
         # Top 5 clientes con más compras
-        top_clientes = Venta.objects.values('cliente__nombre') \
-                        .annotate(total_ventas=Sum('total')) \
-                        .order_by('-total_ventas')[:5]
+        top_clientes = (
+            Venta.objects.values('cliente__nombre')
+            .annotate(total_ventas=Sum('total'))
+            .order_by('-total_ventas')[:5]
+        )
 
         # Convertir Decimal a int para JSON
-        ctx['top_prod'] = [{"producto__nombre": p['producto__nombre'], "total_vendido": int(p['total_vendido'] or 0)} for p in top_prod]
-        ctx['top_clientes'] = [{"cliente__nombre": c['cliente__nombre'], "total_ventas": int(c['total_ventas'] or 0)} for c in top_clientes]
+        ctx['top_prod'] = [
+            {"producto__nombre": p['producto__nombre'], "total_vendido": int(p['total_vendido'] or 0)}
+            for p in top_prod
+        ]
+        ctx['top_clientes'] = [
+            {"cliente__nombre": c['cliente__nombre'], "total_ventas": int(c['total_ventas'] or 0)}
+            for c in top_clientes
+        ]
 
-        # JSON para template
         ctx['top_prod_json'] = json.dumps(ctx['top_prod'])
         ctx['top_clientes_json'] = json.dumps(ctx['top_clientes'])
-
         return ctx
 
+
 # ---------------- GENÉRICO CRUD ----------------
-class GenericListView(ListView):
+class GenericListView(LoginRequiredMixin, ListView):
     template_name = 'ventas/list_generic.html'
     context_object_name = 'object_list'
     model_name = ''
@@ -41,13 +107,11 @@ class GenericListView(ListView):
     add_url = ''
     edit_url = ''
     delete_url = ''
-
-    # NUEVO: campos numéricos
-    numeric_fields = []
+    numeric_fields = []  # campos numéricos
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['title'] = self.title
+        ctx['title'] = getattr(self, 'title', self.model_name)
         ctx['model_name'] = self.model_name
         ctx['columns'] = self.columns
         ctx['fields'] = self.fields
@@ -57,8 +121,8 @@ class GenericListView(ListView):
         ctx['numeric_fields'] = self.numeric_fields
         return ctx
 
-# ---------------- GENÉRICO CRUD ----------------
-class GenericCreateView(CreateView):
+
+class GenericCreateView(LoginRequiredMixin, CreateView):
     template_name = 'ventas/form_generic.html'
     model_name = ''
     fields = []
@@ -80,7 +144,8 @@ class GenericCreateView(CreateView):
             )
         return form
 
-class GenericUpdateView(UpdateView):
+
+class GenericUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'ventas/form_generic.html'
     model_name = ''
     fields = []
@@ -102,16 +167,33 @@ class GenericUpdateView(UpdateView):
             )
         return form
 
-class GenericDeleteView(DeleteView):
+class GenericDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'ventas/confirm_delete.html'
     model_name = ''
     list_url = ''
+    success_url = None  # evita que Django redirija automáticamente
+
+    def post(self, request, *args, **kwargs):
+        obj = self.get_object()
+        redirect_url = reverse_lazy(self.list_url)
+
+        try:
+            obj.delete()
+            messages.success(request, f"✅ {self.model_name} eliminado correctamente.")
+        except ProtectedError:
+            messages.error(
+                request,
+                f"❌ No se puede eliminar este {self.model_name} porque está relacionado con otros registros."
+            )
+
+        return redirect(redirect_url)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['model_name'] = self.model_name
         ctx['list_url'] = reverse_lazy(self.list_url)
         return ctx
+
 
 # ---------------- CLIENTES ----------------
 class ClienteList(GenericListView):
@@ -123,7 +205,8 @@ class ClienteList(GenericListView):
     add_url = 'ventas:clientes_create'
     edit_url = 'ventas:clientes_update'
     delete_url = 'ventas:clientes_delete'
-    numeric_fields = []  # no hay campos numéricos
+    numeric_fields = []
+
 
 class ClienteCreate(GenericCreateView):
     model = Cliente
@@ -132,6 +215,7 @@ class ClienteCreate(GenericCreateView):
     list_url = 'ventas:clientes_list'
     success_url = reverse_lazy('ventas:clientes_list')
 
+
 class ClienteUpdate(GenericUpdateView):
     model = Cliente
     fields = ['nombre', 'email', 'telefono']
@@ -139,11 +223,13 @@ class ClienteUpdate(GenericUpdateView):
     list_url = 'ventas:clientes_list'
     success_url = reverse_lazy('ventas:clientes_list')
 
+
 class ClienteDelete(GenericDeleteView):
     model = Cliente
     model_name = "Cliente"
     list_url = 'ventas:clientes_list'
     success_url = reverse_lazy('ventas:clientes_list')
+
 
 # ---------------- PRODUCTOS ----------------
 class ProductoList(GenericListView):
@@ -155,7 +241,8 @@ class ProductoList(GenericListView):
     add_url = 'ventas:productos_create'
     edit_url = 'ventas:productos_update'
     delete_url = 'ventas:productos_delete'
-    numeric_fields = ["precio","stock"]
+    numeric_fields = ["precio", "stock"]
+
 
 class ProductoCreate(GenericCreateView):
     model = Producto
@@ -164,6 +251,7 @@ class ProductoCreate(GenericCreateView):
     list_url = 'ventas:productos_list'
     success_url = reverse_lazy('ventas:productos_list')
 
+
 class ProductoUpdate(GenericUpdateView):
     model = Producto
     fields = ['nombre', 'precio', 'stock']
@@ -171,11 +259,13 @@ class ProductoUpdate(GenericUpdateView):
     list_url = 'ventas:productos_list'
     success_url = reverse_lazy('ventas:productos_list')
 
+
 class ProductoDelete(GenericDeleteView):
     model = Producto
     model_name = "Producto"
     list_url = 'ventas:productos_list'
     success_url = reverse_lazy('ventas:productos_list')
+
 
 # ---------------- VENTAS ----------------
 class VentaList(GenericListView):
@@ -189,12 +279,14 @@ class VentaList(GenericListView):
     delete_url = 'ventas:ventas_delete'
     numeric_fields = ["total"]
 
+
 class VentaCreate(GenericCreateView):
     model = Venta
     fields = ['cliente', 'total', 'fecha']
     model_name = "Venta"
     list_url = 'ventas:ventas_list'
     success_url = reverse_lazy('ventas:ventas_list')
+
 
 class VentaUpdate(GenericUpdateView):
     model = Venta
@@ -203,11 +295,13 @@ class VentaUpdate(GenericUpdateView):
     list_url = 'ventas:ventas_list'
     success_url = reverse_lazy('ventas:ventas_list')
 
+
 class VentaDelete(GenericDeleteView):
     model = Venta
     model_name = "Venta"
     list_url = 'ventas:ventas_list'
     success_url = reverse_lazy('ventas:ventas_list')
+
 
 # ---------------- DETALLE VENTAS ----------------
 class DetalleVentaList(GenericListView):
@@ -221,6 +315,7 @@ class DetalleVentaList(GenericListView):
     delete_url = 'ventas:detalleventas_delete'
     numeric_fields = ["cantidad"]
 
+
 class DetalleVentaCreate(GenericCreateView):
     model = DetalleVenta
     fields = ['venta', 'producto', 'cantidad']
@@ -228,12 +323,14 @@ class DetalleVentaCreate(GenericCreateView):
     list_url = 'ventas:detalleventas_list'
     success_url = reverse_lazy('ventas:detalleventas_list')
 
+
 class DetalleVentaUpdate(GenericUpdateView):
     model = DetalleVenta
     fields = ['venta', 'producto', 'cantidad']
     model_name = "DetalleVenta"
     list_url = 'ventas:detalleventas_list'
     success_url = reverse_lazy('ventas:detalleventas_list')
+
 
 class DetalleVentaDelete(GenericDeleteView):
     model = DetalleVenta

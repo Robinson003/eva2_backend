@@ -1,37 +1,51 @@
-{% extends 'ventas/base.html' %}
-{% block title %}{{ model_name }}{% endblock %}
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="max-w-xl mx-auto mt-8">
-  <h1 class="text-2xl font-bold mb-6">{{ title }}</h1>
+<div class="container mt-4" style="max-width: 700px;">
 
-  <form method="post" class="bg-white p-6 rounded-lg shadow-md space-y-6">
-    {% csrf_token %}
+    <h2 class="fw-bold text-success mb-4">{{ title }}</h2>
 
-    <!-- Campos del formulario -->
-    {% for field in form %}
-      <div class="mb-4">
-        <label for="{{ field.id_for_label }}" class="block text-gray-700 font-medium mb-1">
-          {{ field.label }}{% if field.field.required %} <span class="text-red-500">*</span>{% endif %}
-        </label>
+    <form method="post" class="bg-white p-4 rounded-3 shadow-sm">
+        {% csrf_token %}
 
-        {{ field }}
+        {% for field in form %}
+            <div class="mb-3">
+                <label class="form-label">
+                    {{ field.label }}
+                    {% if field.field.required %}
+                        <span class="text-danger">*</span>
+                    {% endif %}
+                </label>
 
-        {% if field.errors %}
-          <p class="text-red-500 text-sm mt-1">{{ field.errors|striptags }}</p>
-        {% endif %}
-      </div>
-    {% endfor %}
+                {{ field }}
 
-    <!-- Botones -->
-    <div class="flex justify-start gap-3 mt-4">
-      <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded shadow-md transition duration-200">
-        Guardar
-      </button>
-      <a href="{{ list_url }}" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded transition duration-200">
-        Cancelar
-      </a>
-    </div>
-  </form>
+                {% if field.errors %}
+                    <div class="text-danger small">{{ field.errors|striptags }}</div>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-success px-4">Guardar</button>
+
+            <a href="{{ list_url }}" class="btn btn-secondary px-4">Cancelar</a>
+        </div>
+    </form>
+
 </div>
+
+<style>
+    input, select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+    }
+    input:focus, select:focus {
+        border-color: #198754 !important;
+        box-shadow: 0 0 4px rgba(25, 135, 84, .4) !important;
+        outline: none;
+    }
+</style>
 {% endblock %}

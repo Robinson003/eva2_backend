@@ -1,37 +1,39 @@
-{% extends 'ventas/base.html' %}
-{% load static %}
+{% extends 'base.html' %}
 {% load utils %}
 
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold mb-4">{{ title }}</h1>
+<h1 class="text-2xl font-bold mb-6 text-gray-800">{{ title }}</h1>
 
+<!-- Botón agregar -->
 <div class="mb-4">
     <a href="{% url add_url %}" 
-       class="bg-green-500 hover:bg-green-600 text-white font-medium px-4 py-2 rounded shadow-md inline-flex items-center gap-2 transition duration-200 ease-in-out transform hover:-translate-y-1 hover:shadow-lg">
-        <span class="text-white text-lg font-bold">+</span>
+       class="bg-green-600 text-white px-5 py-2 rounded-md shadow hover:bg-green-700 transition">
         Nuevo {{ model_name }}
     </a>
 </div>
 
-<div class="overflow-x-auto">
-    <table class="min-w-full bg-white border border-gray-200">
-        <thead class="bg-gray-100">
+<!-- Tabla -->
+<div class="overflow-x-auto shadow rounded-lg border border-gray-200">
+    <table class="min-w-full bg-white">
+        <thead class="bg-gray-100 border-b">
             <tr>
                 {% for col in columns %}
-                <th class="text-center px-4 py-2 border-b border-gray-200 {% if forloop.last %}w-[34%]{% else %}w-[22%]{% endif %}">
+                <th class="px-4 py-2 text-center text-gray-700 font-medium">
                     {{ col }}
                 </th>
                 {% endfor %}
-                <th class="px-4 py-2 border-b border-gray-200 text-center w-[34%]">Acciones</th>
+                <th class="px-4 py-2 text-center text-gray-700 font-medium">Acciones</th>
             </tr>
         </thead>
+
         <tbody>
             {% for object in object_list %}
-            <tr class="hover:bg-green-50 hover:text-green-600 transition-colors duration-300">
+            <tr class="hover:bg-green-50 transition">
+                
                 {% for field in fields %}
-                <td class="px-4 py-2 border-b border-gray-200 {% if forloop.first %}text-left{% elif forloop.counter == 2 %}text-center{% else %}text-center{% endif %}">
+                <td class="px-4 py-3 text-center text-gray-700 border-b">
                     {% if field in numeric_fields %}
                         {{ object|get_attr:field|floatformat:0 }}
                     {% else %}
@@ -39,34 +41,33 @@
                     {% endif %}
                 </td>
                 {% endfor %}
-                <td class="px-4 py-2 border-b border-gray-200 text-center flex justify-center gap-2">
-                    <!-- Botón Editar -->
-                    <a href="{% url edit_url object.pk %}" 
-                       class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 flex items-center gap-1">
-                        <!-- Heroicons Pencil -->
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 4H4a1 1 0 00-1 1v16a1 1 0 001 1h16a1 1 0 001-1v-7M16.5 3.5l4 4L12 16l-4 1 1-4 8.5-8.5z" />
-                        </svg>
+
+                <!-- Acciones -->
+                <td class="px-4 py-3 text-center border-b flex justify-center gap-3">
+
+                    <a href="{% url edit_url object.pk %}"
+                       class="text-blue-600 hover:text-blue-800 font-medium transition">
                         Editar
                     </a>
 
-                    <!-- Botón Eliminar -->
-                    <a href="{% url delete_url object.pk %}" 
-                       class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 flex items-center gap-1">
-                        <!-- Heroicons Trash -->
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5-4h4m-4 0a2 2 0 00-2 2v0a2 2 0 002 2h4a2 2 0 002-2v0a2 2 0 00-2-2m-4 0h4" />
-                        </svg>
+                    <a href="{% url delete_url object.pk %}"
+                       class="text-red-600 hover:text-red-800 font-medium transition">
                         Eliminar
                     </a>
+
                 </td>
+
             </tr>
+
             {% empty %}
             <tr>
-                <td colspan="{{ fields|length|add:'1' }}" class="px-4 py-2 text-center text-gray-500">No hay datos disponibles</td>
+                <td colspan="{{ fields|length|add:'1' }}" class="px-4 py-4 text-center text-gray-500">
+                    No hay datos disponibles.
+                </td>
             </tr>
             {% endfor %}
         </tbody>
+
     </table>
 </div>
 {% endblock %}
